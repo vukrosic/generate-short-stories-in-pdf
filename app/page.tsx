@@ -9,6 +9,7 @@ import { jsPDF } from "jspdf";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Step 3: Update the generateImage function in page.tsx
 const generateImage = async (userPrompt: string, style: string, apiKey: string) => {
   const fullPrompt = `${style}: ${userPrompt}`;
   const response = await fetch("/api/predictions", {
@@ -19,12 +20,16 @@ const generateImage = async (userPrompt: string, style: string, apiKey: string) 
     },
     body: JSON.stringify({
       prompt: fullPrompt,
+      apiKey: apiKey
     }),
   });
-  let prediction = await response.json();
-  if (response.status !== 201) {
-    throw new Error(prediction.detail);
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to generate image');
   }
+
+  let prediction = await response.json();
 
   while (
     prediction.status !== "succeeded" &&
@@ -36,10 +41,17 @@ const generateImage = async (userPrompt: string, style: string, apiKey: string) 
         "Authorization": `Bearer ${apiKey}`,
       },
     });
-    prediction = await response.json();
-    if (response.status !== 200) {
-      throw new Error(prediction.detail);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to check prediction status');
     }
+
+    prediction = await response.json();
+  }
+
+  if (prediction.status === "failed") {
+    throw new Error('Image generation failed');
   }
 
   return prediction;
@@ -79,7 +91,7 @@ const generateImagePrompt = (storyPart: string) => {
   return `Scene: ${keywords}`;
 };
 
-const generatePDF = (story: { part1: string; part2: string }, images: string[], style: string) => {
+const generatePDF = (story: { part1: string; part2: string }, images: string[]) => {
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -282,7 +294,7 @@ const Home: NextPage = () => {
                     <p className="text-gray-700 mt-4">{story.part2}</p>
                   </div>
                   <button
-                    onClick={() => generatePDF(story, images, imageStyle)}
+                    onClick={() => generatePDF(story, images)}
                     className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     Download PDF
