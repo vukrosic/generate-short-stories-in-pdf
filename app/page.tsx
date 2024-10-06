@@ -42,31 +42,37 @@ const generateImage = async (userPrompt: string) => {
 };
 
 const generateStory = async (userPrompt: string) => {
-  const chatCompletion = await groq.chat.completions.create({
-    messages: [{
-      role: "user", content: `Write a short horror story based on this prompt: "${userPrompt}". 
-    The story should be in two distinct parts, each around 150 words long. 
-    Clearly separate the two parts with [PART1] and [PART2] tags.` }],
-    model: "llama-3.1-8b-instant",
-    temperature: 1,
-    max_tokens: 1024,
-    top_p: 1,
-    stream: false,
-    stop: null
-  });
-
-  const content = chatCompletion.choices[0]?.message?.content || '';
-  const parts = content.split(/\[PART[12]\]/);
-  return {
-    part1: parts[1]?.trim() || '',
-    part2: parts[2]?.trim() || ''
-  };
+  try {
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [{
+        role: "user", content: `Write a short story based on this prompt: "${userPrompt}". 
+      The story should be in two distinct parts, each around 150 words long. 
+      Clearly separate the two parts with [PART1] and [PART2] tags.` }],
+      model: "llama-3.1-8b-instant",
+      temperature: 1,
+      max_tokens: 1024,
+      top_p: 1,
+      stream: false,
+      stop: null
+    });
+    console.log(chatCompletion.choices[0]);
+    console.log(chatCompletion.choices[0]?.message?.content);
+    const content = chatCompletion.choices[0]?.message?.content || '';
+    const parts = content.split(/\[PART[12]\]/);
+    return {
+      part1: parts[1]?.trim() || '',
+      part2: parts[2]?.trim() || ''
+    };
+  } catch (error) {
+    console.error('Error generating story:', error);
+    throw new Error('Failed to generate story. Please try again.');
+  }
 };
 
 const generateImagePrompt = (storyPart: string) => {
   // Extract key elements from the story part to create an image prompt
   const keywords = storyPart.split(' ').slice(0, 10).join(' '); // Use first 10 words as keywords
-  return `Horror scene: ${keywords}`;
+  return `Scene: ${keywords}`;
 };
 
 const generatePDF = (story: { part1: string; part2: string }, images: string[]) => {
@@ -120,7 +126,7 @@ const generatePDF = (story: { part1: string; part2: string }, images: string[]) 
   yOffset += secondImageHeight + 10;
   addTextWithPagination(story.part2, yOffset);
 
-  pdf.save('horror_story.pdf');
+  pdf.save('generated_story.pdf');
 };
 
 const Home: NextPage = () => {
@@ -134,6 +140,8 @@ const Home: NextPage = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setStory(null);
+    setImages([]);
 
     try {
       const generatedStory = await generateStory(prompt);
@@ -152,8 +160,6 @@ const Home: NextPage = () => {
         imagePrediction2.output[imagePrediction2.output.length - 1]
       ];
       setImages(imageUrls);
-
-      generatePDF(generatedStory, imageUrls);
     } catch (error) {
       console.error('Error generating content:', error);
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
@@ -163,27 +169,27 @@ const Home: NextPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 py-6 flex flex-col justify-center sm:py-12">
+    <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
       <Head>
-        <title>Two-Page Horror Story Generator</title>
+        <title>Two-Page Story Generator</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <div className="relative py-3 sm:max-w-xl sm:mx-auto">
-        <div className="absolute inset-0 bg-gradient-to-r from-red-400 to-red-600 shadow-lg transform -skew-y-6 sm:skew-y-0 sm:-rotate-6 sm:rounded-3xl"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-blue-600 shadow-lg transform -skew-y-6 sm:skew-y-0 sm:-rotate-6 sm:rounded-3xl"></div>
         <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
           <div className="max-w-md mx-auto">
             <div className="divide-y divide-gray-200">
               <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
-                <h2 className="text-3xl font-extrabold text-gray-900">Two-Page Horror Story Generator</h2>
+                <h2 className="text-3xl font-extrabold text-gray-900">Two-Page Story Generator</h2>
                 <form onSubmit={handleSubmit} className="mt-8 space-y-6">
                   <div className="rounded-md shadow-sm -space-y-px">
                     <div>
                       <input
                         type="text"
                         required
-                        className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                        placeholder="Enter your horror story prompt"
+                        className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                        placeholder="Enter your story prompt"
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                       />
@@ -194,9 +200,9 @@ const Home: NextPage = () => {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
-                      {loading ? 'Generating...' : 'Generate Two-Page Horror Story'}
+                      {loading ? 'Generating...' : 'Generate Two-Page Story'}
                     </button>
                   </div>
                 </form>
@@ -211,7 +217,7 @@ const Home: NextPage = () => {
                     <h4 className="text-lg font-semibold mb-2">Page 1</h4>
                     <Image
                       src={images[0]}
-                      alt="Horror scene for page 1"
+                      alt="Scene for page 1"
                       sizes="100vw"
                       height={768}
                       width={768}
@@ -223,7 +229,7 @@ const Home: NextPage = () => {
                     <h4 className="text-lg font-semibold mb-2">Page 2</h4>
                     <Image
                       src={images[1]}
-                      alt="Horror scene for page 2"
+                      alt="Scene for page 2"
                       sizes="100vw"
                       height={768}
                       width={768}
@@ -233,7 +239,7 @@ const Home: NextPage = () => {
                   </div>
                   <button
                     onClick={() => generatePDF(story, images)}
-                    className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     Download PDF
                   </button>
